@@ -9,96 +9,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
 
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            background-color: #1e1e1e; /* 옵시디언 다크모드 느낌의 배경색 */
-        }
-
-        header {
-            background-color: #2d2d2d; 
-            color: #e0e0e0;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid #444;
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: 1.2rem;
-        }
-
-        .container {
-            display: flex;
-            flex: 1; 
-            overflow: hidden;
-        }
-
-        #mindmap-area {
-            flex: 7;
-            background-color: #1e1e1e; /* 그래프 영역 다크 배경 */
-            border-right: 1px solid #444;
-            position: relative;
-        }
-
-        #detail-area {
-            flex: 3;
-            padding: 20px;
-            background-color: #252525; /* 우측 패널 다크 배경 */
-            color: #e0e0e0;
-            overflow-y: auto; 
-        }
-
-        .info-box {
-            border: 1px solid #444;
-            border-radius: 8px;
-            padding: 15px;
-            background-color: #2d2d2d;
-            min-height: 200px;
-        }
-
-        .info-box h2 {
-            margin-top: 0;
-            font-size: 1.1rem;
-            color: #a371f7; /* 옵시디언 스타일의 포인트 컬러 (보라색) */
-            border-bottom: 1px solid #555;
-            padding-bottom: 10px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-            margin-top: 15px;
-        }
-
-        table th, table td {
-            border: 1px solid #555;
-            padding: 10px 8px;
-            text-align: left;
-        }
-
-        table th {
-            background-color: #383838;
-            width: 35%;
-            color: #e0e0e0;
-        }
-        
-        table tr:hover {
-            background-color: #3d3d3d;
-        }
-        
-        .placeholder-text {
-            color: #aaa;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
+        body { margin: 0; padding: 0; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; display: flex; flex-direction: column; height: 100vh; background-color: #1e1e1e; }
+        header { background-color: #2d2d2d; color: #e0e0e0; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; }
+        header h1 { margin: 0; font-size: 1.2rem; }
+        .container { display: flex; flex: 1; overflow: hidden; }
+        #mindmap-area { flex: 7; background-color: #1e1e1e; border-right: 1px solid #444; position: relative; }
+        #detail-area { flex: 3; padding: 20px; background-color: #252525; color: #e0e0e0; overflow-y: auto; }
+        .info-box { border: 1px solid #444; border-radius: 8px; padding: 15px; background-color: #2d2d2d; min-height: 200px; }
+        .info-box h2 { margin-top: 0; font-size: 1.1rem; color: #a371f7; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 15px; }
+        table th, table td { border: 1px solid #555; padding: 10px 8px; text-align: left; }
+        table th { background-color: #383838; width: 35%; color: #e0e0e0; }
+        table tr:hover { background-color: #3d3d3d; }
+        .placeholder-text { color: #aaa; font-size: 0.95rem; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -135,35 +58,26 @@
             myChart.resize();
         });
 
-        // 1. CSV 데이터를 네트워크 그래프(Nodes, Links) 구조로 변환
         function buildGraphData(data) {
             let nodes = [];
             let links = [];
-            let nodeMap = new Map(); // 중복 노드 방지용
+            let nodeMap = new Map();
 
-            // 노드 추가 헬퍼 함수
             function addNode(id, name, category, value = null, symbolSize = 20) {
                 if (!nodeMap.has(id)) {
-                    let node = { 
-                        id: id, 
-                        name: name, 
-                        category: category, 
-                        symbolSize: symbolSize 
-                    };
-                    if (value) node.value = value; // 상세 정보 창을 위한 원본 데이터 저장
+                    let node = { id: id, name: name, category: category, symbolSize: symbolSize };
+                    if (value) node.value = value;
                     nodes.push(node);
                     nodeMap.set(id, true);
                 }
             }
 
-            // 링크 추가 헬퍼 함수
             function addLink(source, target) {
                 links.push({ source: source, target: target });
             }
 
-            // [최상위 루트 노드]
             const rootId = 'root';
-            addNode(rootId, '온라인 콘텐츠', 0, null, 50);
+            addNode(rootId, '온라인 콘텐츠', 0, null, 40);
 
             data.forEach((row, index) => {
                 if (!row['콘텐츠명'] || row['콘텐츠명'].trim() === '') return;
@@ -172,37 +86,32 @@
                 const ai = row['AI교육여부'] || '분류없음';
                 const contentName = row['콘텐츠명'];
 
-                // 고유 ID 생성 (O, X가 여러 개 생기지 않도록 경로를 포함)
                 const availId = `avail_${avail}`;
                 const aiId = `ai_${avail}_${ai}`;
-                const contentId = `content_${index}`; // 콘텐츠는 이름이 같아도 개별 노드로 취급하기 위해 인덱스 사용
+                const contentId = `content_${index}`; 
 
-                // 1단계 노드 (공동활용) 및 연결
-                addNode(availId, avail, 1, null, 40);
+                addNode(availId, avail, 1, null, 30);
                 addLink(rootId, availId);
 
-                // 2단계 노드 (AI교육) 및 연결
-                addNode(aiId, ai, 2, null, 30);
+                addNode(aiId, ai, 2, null, 20);
                 addLink(availId, aiId);
 
-                // 3단계 노드 (콘텐츠명) 및 연결
-                addNode(contentId, contentName, 3, row, 15);
+                // 🔥 3단계 노드 (콘텐츠명): 심볼 크기를 기존 15에서 5로 대폭 축소
+                addNode(contentId, contentName, 3, row, 5);
                 addLink(aiId, contentId);
             });
 
             return { nodes, links };
         }
 
-        // 2. ECharts 네트워크 그래프 렌더링 함수
         function renderGraph(graphData) {
             myChart.showLoading();
             
             const option = {
                 tooltip: {
                     trigger: 'item',
-                    formatter: '{b}' // 노드 이름만 표시
+                    formatter: '{b}' // 툴팁에서는 전체 콘텐츠명 표시
                 },
-                // 카테고리별 색상 설정 (옵시디언 스타일 색감)
                 color: ['#a371f7', '#4facfe', '#00f2fe', '#f5576c'],
                 legend: {
                     data: ['루트', '공동활용', 'AI교육', '콘텐츠'],
@@ -212,33 +121,41 @@
                 series: [
                     {
                         type: 'graph',
-                        layout: 'force', // 물리 엔진(Force-directed) 레이아웃 적용
+                        layout: 'force', 
                         data: graphData.nodes,
                         links: graphData.links,
+                        // 🔥 카테고리별로 라벨(글씨) 크기를 세밀하게 조정
                         categories: [
-                            { name: '루트' },
-                            { name: '공동활용' },
-                            { name: 'AI교육' },
-                            { name: '콘텐츠' }
+                            { name: '루트', label: { fontSize: 16, fontWeight: 'bold' } },
+                            { name: '공동활용', label: { fontSize: 14, fontWeight: 'bold' } },
+                            { name: 'AI교육', label: { fontSize: 13 } },
+                            { name: '콘텐츠', label: { fontSize: 10, color: '#999' } } // 끝단 콘텐츠 글씨 크기 10으로 축소 및 색상 톤다운
                         ],
-                        roam: true, // 마우스 휠 확대/축소 및 드래그 이동 허용
-                        draggable: true, // 노드 드래그 허용
+                        roam: true, 
+                        draggable: true, 
                         label: {
                             show: true,
                             position: 'right',
-                            color: '#ccc',
-                            fontSize: 11,
-                            // 노드 크기가 작은 콘텐츠 노드는 라벨을 숨기거나 줄일 수 있음
+                            formatter: function(params) {
+                                // 🔥 글자가 10자를 넘어가면 말줄임표(...) 처리하여 겹침 방지
+                                if (params.data.category === 3 && params.name.length > 10) {
+                                    return params.name.substring(0, 10) + '...';
+                                }
+                                return params.name;
+                            }
                         },
                         force: {
-                            repulsion: 300, // 노드 간 밀어내는 힘 (값이 클수록 넓게 퍼짐)
-                            edgeLength: [50, 100], // 선의 길이 [최소, 최대]
-                            gravity: 0.1 // 중앙으로 모이려는 힘
+                            // 🔥 반발력 대폭 증가 (300 -> 800) : 노드들이 훨씬 멀리 퍼집니다.
+                            repulsion: 800, 
+                            // 🔥 선 길이 증가 : 좁은 공간에 뭉치는 것을 방지
+                            edgeLength: [80, 250], 
+                            // 🔥 중력 감소 (0.1 -> 0.05) : 중앙으로 모이려는 성질을 약화시킴
+                            gravity: 0.05 
                         },
                         lineStyle: {
                             color: 'source',
-                            curveness: 0.2, // 선을 살짝 휘게 하여 유기적인 느낌 추가
-                            opacity: 0.6
+                            curveness: 0.2, 
+                            opacity: 0.4 // 선의 투명도를 낮춰 덜 복잡해 보이게 수정
                         }
                     }
                 ]
@@ -248,11 +165,9 @@
             myChart.hideLoading();
         }
 
-        // 3. 노드 클릭 이벤트 처리 (상세 정보 표출)
         myChart.on('click', function (params) {
             const nodeData = params.data;
 
-            // value 속성이 있는 경우(콘텐츠 노드)에만 우측 표 업데이트
             if (nodeData && nodeData.value) {
                 const detailData = nodeData.value;
                 const tableContainer = document.getElementById('table-container');
@@ -279,7 +194,6 @@
             }
         });
 
-        // 4. 파일 업로드 이벤트 리스너
         document.getElementById('csvFileInput').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -292,8 +206,6 @@
                 skipEmptyLines: true,
                 complete: function(results) {
                     const csvData = results.data;
-                    
-                    // 네트워크 그래프용 데이터 생성 및 렌더링
                     const graphData = buildGraphData(csvData);
                     renderGraph(graphData);
                 },
