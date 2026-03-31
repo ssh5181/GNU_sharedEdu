@@ -235,4 +235,127 @@
                             }
                         },
                         force: {
-                            repulsion: 600, // 기본적으로 많은 노드가 숨겨져 있으므로 밀어내는 힘을
+                            repulsion: 600, // 기본적으로 많은 노드가 숨겨져 있으므로 밀어내는 힘을 약간 낮춤
+                            edgeLength: [50, 130], 
+                            gravity: 0.15 
+                        },
+                        lineStyle: {
+                            color: 'source',
+                            curveness: 0.2, 
+                            opacity: 0.4 
+                        }
+                    }
+                ]
+            };
+
+            // true 대신 false를 주어 차트가 부드럽게 업데이트 되도록 함 (애니메이션 효과)
+            myChart.setOption(option, false);
+            myChart.hideLoading(); 
+        }
+
+        // 4. 노드 클릭 이벤트 (접기/펼치기 및 우측 패널 표출)
+        myChart.on('click', function (params) {
+            const nodeData = params.data;
+            const tableContainer = document.getElementById('table-container');
+            const infoBoxTitle = document.querySelector('#infoBox h2');
+
+            // 🔥 [추가된 로직] Category 2 (제작부서) 클릭 시 접기/펼치기 토글
+            if (nodeData.category === 2) {
+                // 전체 데이터 배열에서 해당 노드를 찾아 상태(collapsed)를 반전시킴
+                let targetNode = fullGraphData.nodes.find(n => n.id === nodeData.id);
+                if (targetNode) {
+                    targetNode.collapsed = !targetNode.collapsed;
+                    // 필터링된 새 데이터를 차트에 업데이트 적용
+                    const visibleData = getVisibleData();
+                    myChart.setOption({
+                        series: [{
+                            data: visibleData.nodes,
+                            links: visibleData.links
+                        }]
+                    });
+                }
+            }
+
+            // [기존 로직] 클릭 시 우측 상세 정보 패널 업데이트
+            if ([0, 1, 2].includes(nodeData.category) && nodeData.contentList) {
+                const baseName = nodeData.category === 1 ? nodeData.name.split(' (')[0] : nodeData.name;
+                const displayName = baseName + " 콘텐츠 목록";
+                
+                infoBoxTitle.textContent = displayName + ` (총 ${nodeData.contentList.length}건)`;
+
+                let tableHTML = '<table><thead><tr><th style="width: 15%;" class="text-center">연번</th><th>콘텐츠명</th><th style="width: 25%;">학문분류</th></tr></thead><tbody>';
+                
+                nodeData.contentList.forEach((row, index) => {
+                    const contentName = row['콘텐츠명'] || '-';
+                    const category = row['학문분류'] || '-';
+                    tableHTML += `
+                        <tr>
+                            <td class="text-center">${index + 1}</td>
+                            <td>${contentName}</td>
+                            <td>${category}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableHTML += '</tbody></table>';
+                tableContainer.innerHTML = tableHTML;
+            }
+            else if (nodeData.category === 3 && nodeData.value) {
+                const detailData = nodeData.value;
+                infoBoxTitle.textContent = "상세 정보 : " + nodeData.name;
+
+                let tableHTML = '<table><tbody>';
+                for (const key in detailData) {
+                    if (detailData.hasOwnProperty(key)) {
+                        const cellValue = detailData[key] ? detailData[key] : '-';
+                        tableHTML += `
+                            <tr>
+                                <th style="width: 35%;">${key}</th>
+                                <td>${cellValue}</td>
+                            </tr>
+                        `;
+                    }
+                }
+                
+                tableHTML += '</tbody></table>';
+                tableContainer.innerHTML = tableHTML;
+            }
+        });
+
+        // 5. 페이지 로드 시 CSV 자동 연동
+        window.addEventListener('DOMContentLoaded', () => {
+            myChart.showLoading(); 
+
+            const csvFilePath = 'data.csv'; 
+
+            Papa.parse(csvFilePath, {
+                download: true,
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const csvData = results.data;
+                    
+                    document.getElementById('table-container').innerHTML = `
+                        <p class="placeholder-text" style="color:#a371f7; font-weight:bold;">
+                            데이터 로드 완료! <br><br>
+                            1. <b>[제작부서(➕)]</b> 노드를 클릭하면 숨겨져 있던 콘텐츠가 펼쳐집니다.<br><br>
+                            2. <b>[부서명]</b> 등 큰 노드를 클릭하면 해당 그룹의 전체 목록이 우측에 표출됩니다.<br><br>
+                            3. 펼쳐진 <b>[콘텐츠명]</b>(작은 점)을 클릭하면 세부 정보가 표출됩니다.
+                        </p>
+                    `;
+                    
+                    // 전체 데이터를 전역 변수에 저장 후 차트 렌더링
+                    fullGraphData = buildGraphData(csvData);
+                    initChart();
+                },
+                error: function(err) {
+                    alert("데이터를 불러오는 중 오류가 발생했습니다. CSV 파일명(data.csv)과 경로를 확인해주세요.");
+                    console.error(err);
+                    myChart.hideLoading();
+                    document.getElementById('loading-text').textContent = "데이터 로드 실패";
+                }
+            });
+        });
+    </script>
+</body>
+</html>
