@@ -3,26 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>교육혁신처 온라인콘텐츠 네트워크 시각화</title>
+    <title>온라인콘텐츠 네트워크 시각화</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
 
     <style>
+        /* 기본 설정 및 PC 화면(가로 레이아웃) */
         body { margin: 0; padding: 0; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; display: flex; flex-direction: column; height: 100vh; background-color: #1e1e1e; }
         header { background-color: #2d2d2d; color: #e0e0e0; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; }
         header h1 { margin: 0; font-size: 1.2rem; }
-        .container { display: flex; flex: 1; overflow: hidden; }
+        .container { display: flex; flex: 1; overflow: hidden; flex-direction: row; }
+        
         #mindmap-area { flex: 7; background-color: #1e1e1e; border-right: 1px solid #444; position: relative; }
-        #detail-area { flex: 3; padding: 20px; background-color: #252525; color: #e0e0e0; overflow-y: auto; }
+        #detail-area { flex: 3; padding: 20px; background-color: #252525; color: #e0e0e0; overflow-y: auto; box-sizing: border-box; }
+        
         .info-box { border: 1px solid #444; border-radius: 8px; padding: 15px; background-color: #2d2d2d; min-height: 200px; }
         .info-box h2 { margin-top: 0; font-size: 1.1rem; color: #a371f7; border-bottom: 1px solid #555; padding-bottom: 10px; }
+        
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 15px; }
-        table th, table td { border: 1px solid #555; padding: 8px 6px; text-align: left; }
+        table th, table td { border: 1px solid #555; padding: 8px 6px; text-align: left; word-break: keep-all; }
         table th { background-color: #383838; color: #e0e0e0; font-weight: bold; }
         table tr:hover { background-color: #3d3d3d; }
+        
         .placeholder-text { color: #aaa; font-size: 0.95rem; line-height: 1.5; }
         .text-center { text-align: center; }
+
+        /* 🔥 모바일 화면용 반응형 CSS (세로 레이아웃 전환) */
+        @media screen and (max-width: 768px) {
+            header { flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 15px; }
+            header h1 { font-size: 1.1rem; }
+            
+            /* 좌우 배치를 상하 배치로 변경 */
+            .container { flex-direction: column; }
+            
+            /* 상단: 마인드맵 영역 (화면의 60% 차지) */
+            #mindmap-area { flex: 6; border-right: none; border-bottom: 2px solid #444; width: 100%; }
+            
+            /* 하단: 상세 정보 영역 (화면의 40% 차지) */
+            #detail-area { flex: 4; width: 100%; padding: 10px; }
+            
+            .info-box { padding: 10px; min-height: auto; }
+            .info-box h2 { font-size: 1rem; margin-bottom: 10px; }
+            table { font-size: 0.75rem; margin-top: 10px; }
+            table th, table td { padding: 6px 4px; }
+            .placeholder-text { font-size: 0.85rem; }
+        }
     </style>
 </head>
 <body>
@@ -51,14 +77,12 @@
     <script>
         let myChart = echarts.init(document.getElementById('mindmap-area'));
         
-        // 원본 전체 데이터를 보관할 전역 변수
         let fullGraphData = { nodes: [], links: [] };
 
         window.addEventListener('resize', function() {
             myChart.resize();
         });
 
-        // 1. 전체 데이터를 노드와 링크 구조로 변환하는 함수
         function buildGraphData(data) {
             let nodes = [];
             let links = [];
@@ -79,14 +103,12 @@
                 const deptId = `dept_${aiId}_${deptLabel}`; 
                 const contentId = `content_${index}`; 
 
-                // Category 0
                 if (!nodeMap.has(availId)) {
                     nodes.push({ id: availId, name: availLabel, category: 0, symbolSize: 55, contentList: [] });
                     nodeMap.set(availId, true);
                 }
                 nodes.find(n => n.id === availId).contentList.push(row);
 
-                // Category 1
                 let aiNode = nodes.find(n => n.id === aiId);
                 if (!aiNode) {
                     aiNode = { id: aiId, name: aiLabel, category: 1, symbolSize: 40, contentList: [] };
@@ -96,7 +118,6 @@
                 }
                 aiNode.contentList.push(row);
 
-                // Category 2 (제작부서) - 🔥 collapsed 속성을 true로 설정하여 기본적으로 접어둠
                 let deptNode = nodes.find(n => n.id === deptId);
                 if (!deptNode) {
                     deptNode = { id: deptId, name: deptLabel, category: 2, symbolSize: 28, contentList: [], collapsed: true };
@@ -106,7 +127,6 @@
                 }
                 deptNode.contentList.push(row);
 
-                // Category 3 (콘텐츠) - 🔥 부모 노드(deptId)가 누구인지 기억하도록 parentId 속성 추가
                 if (!nodeMap.has(contentId)) {
                     nodes.push({ id: contentId, name: contentName, category: 3, value: row, symbolSize: 6, parentId: deptId });
                     nodeMap.set(contentId, true);
@@ -125,21 +145,17 @@
             return { nodes, links };
         }
 
-        // 2. 화면에 보여줄 데이터만 필터링하는 함수
         function getVisibleData() {
-            // 접혀있는 부서(Category 2)의 자식 노드(Category 3)는 제외함
             let visibleNodes = fullGraphData.nodes.filter(node => {
                 if (node.category === 3) {
                     let parent = fullGraphData.nodes.find(n => n.id === node.parentId);
-                    // 부모 노드가 있고, 부모가 '접혀있지 않을 때(collapsed: false)'만 화면에 표시
                     return parent && !parent.collapsed;
                 }
-                return true; // 카테고리 0, 1, 2는 항상 표시
+                return true; 
             });
 
             let visibleNodeIds = new Set(visibleNodes.map(n => n.id));
 
-            // 화면에 표시되는 노드들끼리 연결된 선만 남김
             let visibleLinks = fullGraphData.links.filter(link => {
                 let sourceId = typeof link.source === 'object' ? link.source.id : link.source;
                 let targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -166,7 +182,6 @@
             name3Emph: { fontSize: 13, color: '#fff', backgroundColor: 'rgba(0,0,0,0.7)', padding: [4, 6], borderRadius: 4 }
         };
 
-        // 3. 차트 렌더링 함수 (최초 로드 시 1회 호출)
         function initChart() {
             const visibleData = getVisibleData();
             
@@ -208,7 +223,6 @@
                                     return `{spacer1| }\n{count1|${params.data.contentList.length}}\n{name1|${params.name.split(' (')[0]}}`;
                                 } else if (params.data.category === 2) {
                                     let deptName = params.name.length > 6 ? params.name.substring(0, 6) + '..' : params.name;
-                                    // 🔥 접혀있으면 ➕, 펼쳐져있으면 ➖ 기호를 이름 앞에 표시
                                     let icon = params.data.collapsed ? '➕' : '➖';
                                     return `{spacer2| }\n{count2|${params.data.contentList.length}}\n{name2|${icon} ${deptName}}`;
                                 } else {
@@ -235,7 +249,7 @@
                             }
                         },
                         force: {
-                            repulsion: 600, // 기본적으로 많은 노드가 숨겨져 있으므로 밀어내는 힘을 약간 낮춤
+                            repulsion: 600, 
                             edgeLength: [50, 130], 
                             gravity: 0.15 
                         },
@@ -248,24 +262,19 @@
                 ]
             };
 
-            // true 대신 false를 주어 차트가 부드럽게 업데이트 되도록 함 (애니메이션 효과)
             myChart.setOption(option, false);
             myChart.hideLoading(); 
         }
 
-        // 4. 노드 클릭 이벤트 (접기/펼치기 및 우측 패널 표출)
         myChart.on('click', function (params) {
             const nodeData = params.data;
             const tableContainer = document.getElementById('table-container');
             const infoBoxTitle = document.querySelector('#infoBox h2');
 
-            // 🔥 [추가된 로직] Category 2 (제작부서) 클릭 시 접기/펼치기 토글
             if (nodeData.category === 2) {
-                // 전체 데이터 배열에서 해당 노드를 찾아 상태(collapsed)를 반전시킴
                 let targetNode = fullGraphData.nodes.find(n => n.id === nodeData.id);
                 if (targetNode) {
                     targetNode.collapsed = !targetNode.collapsed;
-                    // 필터링된 새 데이터를 차트에 업데이트 적용
                     const visibleData = getVisibleData();
                     myChart.setOption({
                         series: [{
@@ -276,7 +285,6 @@
                 }
             }
 
-            // [기존 로직] 클릭 시 우측 상세 정보 패널 업데이트
             if ([0, 1, 2].includes(nodeData.category) && nodeData.contentList) {
                 const baseName = nodeData.category === 1 ? nodeData.name.split(' (')[0] : nodeData.name;
                 const displayName = baseName + " 콘텐츠 목록";
@@ -322,7 +330,6 @@
             }
         });
 
-        // 5. 페이지 로드 시 CSV 자동 연동
         window.addEventListener('DOMContentLoaded', () => {
             myChart.showLoading(); 
 
@@ -339,12 +346,11 @@
                         <p class="placeholder-text" style="color:#a371f7; font-weight:bold;">
                             데이터 로드 완료! <br><br>
                             1. <b>[제작부서(➕)]</b> 노드를 클릭하면 숨겨져 있던 콘텐츠가 펼쳐집니다.<br><br>
-                            2. <b>[부서명]</b> 등 큰 노드를 클릭하면 해당 그룹의 전체 목록이 우측에 표출됩니다.<br><br>
-                            3. 펼쳐진 <b>[콘텐츠명]</b>(작은 점)을 클릭하면 세부 정보가 표출됩니다.
+                            2. <b>[부서명]</b> 등 큰 노드를 클릭하면 해당 그룹의 전체 목록이 표출됩니다.<br><br>
+                            3. 펼쳐진 <b>[콘텐츠명]</b>을 클릭하면 세부 정보가 표출됩니다.
                         </p>
                     `;
                     
-                    // 전체 데이터를 전역 변수에 저장 후 차트 렌더링
                     fullGraphData = buildGraphData(csvData);
                     initChart();
                 },
