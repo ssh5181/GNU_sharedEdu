@@ -28,7 +28,7 @@
 <body>
 
     <header>
-        <h1>온라인콘텐츠 활용 여부 기반 네트워크 뷰</h1>
+        <h1>온라인콘텐츠 활용 여부 기반 네트워크 뷰 (부서별 분류 추가)</h1>
         <div style="color: #a371f7; font-size: 0.9rem; font-weight: bold;">
             🟢 데이터 자동 연동 중...
         </div>
@@ -63,38 +63,56 @@
             data.forEach((row, index) => {
                 if (!row['콘텐츠명'] || row['콘텐츠명'].trim() === '') return;
 
+                // 데이터 변수 할당
                 const rawAvail = row['공동활용가능여부'] || '아니오';
                 const availLabel = rawAvail === '예' ? '공동활용 가능' : '공동활용 불가';
                 const rawAi = row['AI교육여부'] || 'X';
                 const aiLabel = `AI교육 ${rawAi} (${availLabel})`; 
+                const deptLabel = row['제작부서'] || '소속미상';
                 const contentName = row['콘텐츠명'];
 
+                // 고유 ID 생성
                 const availId = `avail_${availLabel}`;
                 const aiId = `ai_${availLabel}_${rawAi}`;
+                const deptId = `dept_${aiId}_${deptLabel}`; // 특정 AI교육 노드 하위에 속하는 부서 ID
                 const contentId = `content_${index}`; 
 
+                // 1. 공동활용 그룹 (Category 0)
                 if (!nodeMap.has(availId)) {
                     nodes.push({ id: availId, name: availLabel, category: 0, symbolSize: 55, contentList: [] });
                     nodeMap.set(availId, true);
                 }
                 nodes.find(n => n.id === availId).contentList.push(row);
 
+                // 2. AI교육 여부 (Category 1)
                 let aiNode = nodes.find(n => n.id === aiId);
                 if (!aiNode) {
-                    aiNode = { id: aiId, name: aiLabel, category: 1, symbolSize: 35, contentList: [] };
+                    aiNode = { id: aiId, name: aiLabel, category: 1, symbolSize: 40, contentList: [] };
                     nodes.push(aiNode);
                     nodeMap.set(aiId, true);
                     links.push({ source: availId, target: aiId });
                 }
                 aiNode.contentList.push(row);
 
+                // 3. 제작부서 (Category 2) - 새롭게 추가된 계층
+                let deptNode = nodes.find(n => n.id === deptId);
+                if (!deptNode) {
+                    deptNode = { id: deptId, name: deptLabel, category: 2, symbolSize: 28, contentList: [] };
+                    nodes.push(deptNode);
+                    nodeMap.set(deptId, true);
+                    links.push({ source: aiId, target: deptId });
+                }
+                deptNode.contentList.push(row);
+
+                // 4. 콘텐츠 (Category 3)
                 if (!nodeMap.has(contentId)) {
-                    nodes.push({ id: contentId, name: contentName, category: 2, value: row, symbolSize: 6 });
+                    nodes.push({ id: contentId, name: contentName, category: 3, value: row, symbolSize: 6 });
                     nodeMap.set(contentId, true);
-                    links.push({ source: aiId, target: contentId });
+                    links.push({ source: deptId, target: contentId });
                 }
             });
 
+            // 투명 링크 유지
             if (nodeMap.has('avail_공동활용 가능') && nodeMap.has('avail_공동활용 불가')) {
                 links.push({
                     source: 'avail_공동활용 가능',
@@ -106,21 +124,26 @@
             return { nodes, links };
         }
 
-        // 공통 서식 딕셔너리 (마우스 호버 시에도 동일한 간격 유지용)
+        // 공통 서식 딕셔너리 (텍스트를 원 안/밖으로 정밀하게 정렬)
         const sharedRich = {
-            // Category 0: 노드 반지름 27.5px
-            spacer0: { height: 36, lineHeight: 36 }, // 상단 여백
-            count0: { fontSize: 18, color: '#fff', fontWeight: 'bold', align: 'center', lineHeight: 18 }, // 정중앙 숫자
-            name0: { fontSize: 15, color: '#fff', fontWeight: 'bold', align: 'center', padding: [21, 0, 0, 0], lineHeight: 15 }, // 하단 바깥 텍스트 (투명 여백 21px로 원 밖으로 밀어냄)
+            // Category 0 (공동활용): Size 55
+            spacer0: { height: 36, lineHeight: 36 }, 
+            count0: { fontSize: 18, color: '#fff', fontWeight: 'bold', align: 'center', lineHeight: 18 }, 
+            name0: { fontSize: 15, color: '#fff', fontWeight: 'bold', align: 'center', padding: [21, 0, 0, 0], lineHeight: 15 },
             
-            // Category 1: 노드 반지름 17.5px
+            // Category 1 (AI교육): Size 40
             spacer1: { height: 26, lineHeight: 26 }, 
             count1: { fontSize: 14, color: '#fff', fontWeight: 'bold', align: 'center', lineHeight: 14 },
-            name1: { fontSize: 13, color: '#e0e0e0', fontWeight: 'bold', align: 'center', padding: [13, 0, 0, 0], lineHeight: 13 },
+            name1: { fontSize: 13, color: '#e0e0e0', fontWeight: 'bold', align: 'center', padding: [16, 0, 0, 0], lineHeight: 13 },
+
+            // Category 2 (제작부서): Size 28
+            spacer2: { height: 18, lineHeight: 18 }, 
+            count2: { fontSize: 11, color: '#fff', fontWeight: 'bold', align: 'center', lineHeight: 11 },
+            name2: { fontSize: 11, color: '#ccc', fontWeight: 'bold', align: 'center', padding: [12, 0, 0, 0], lineHeight: 11 },
             
-            // Category 2: 끝단 노드
-            name2: { fontSize: 9, color: '#888' },
-            name2Emph: { fontSize: 13, color: '#fff', backgroundColor: 'rgba(0,0,0,0.7)', padding: [4, 6], borderRadius: 4 }
+            // Category 3 (콘텐츠)
+            name3: { fontSize: 9, color: '#888' },
+            name3Emph: { fontSize: 13, color: '#fff', backgroundColor: 'rgba(0,0,0,0.7)', padding: [4, 6], borderRadius: 4 }
         };
 
         function renderGraph(graphData) {
@@ -128,14 +151,14 @@
                 tooltip: {
                     trigger: 'item',
                     formatter: function(params) {
-                        if (params.data.category === 0) return `${params.name} (${params.data.contentList.length}건)`;
+                        if ([0, 2].includes(params.data.category)) return `${params.name} (${params.data.contentList.length}건)`;
                         if (params.data.category === 1) return `${params.name.split(' (')[0]} (${params.data.contentList.length}건)`;
                         return params.name;
                     }
                 },
-                color: ['#a371f7', '#4facfe', '#f5576c'], 
+                color: ['#a371f7', '#4facfe', '#ffb84d', '#f5576c'], // 3번째 색상(노란주황)을 부서 노드에 할당
                 legend: {
-                    data: ['공동활용 그룹', 'AI교육 여부', '콘텐츠'],
+                    data: ['공동활용 그룹', 'AI교육 여부', '제작부서', '콘텐츠'],
                     textStyle: { color: '#e0e0e0' },
                     bottom: 10
                 },
@@ -145,25 +168,28 @@
                         layout: 'force', 
                         data: graphData.nodes,
                         links: graphData.links,
-                        // 그룹별로 텍스트 위치를 다르게 지정
                         categories: [
                             { name: '공동활용 그룹', label: { position: 'inside' } },
                             { name: 'AI교육 여부', label: { position: 'inside' } },
+                            { name: '제작부서', label: { position: 'inside' } },
                             { name: '콘텐츠', label: { position: 'right' } } 
                         ],
                         roam: true, 
                         draggable: true, 
                         label: {
                             show: true,
-                            // 위치와 여백(Padding)을 이용해 숫자는 중심에, 글씨는 바깥에 표시하는 핵심 로직
                             formatter: function(params) {
                                 if (params.data.category === 0) {
                                     return `{spacer0| }\n{count0|${params.data.contentList.length}}\n{name0|${params.name}}`;
                                 } else if (params.data.category === 1) {
                                     return `{spacer1| }\n{count1|${params.data.contentList.length}}\n{name1|${params.name.split(' (')[0]}}`;
+                                } else if (params.data.category === 2) {
+                                    // 제작부서명이 너무 길면 6글자에서 생략하여 깔끔하게 표출
+                                    let deptName = params.name.length > 6 ? params.name.substring(0, 6) + '..' : params.name;
+                                    return `{spacer2| }\n{count2|${params.data.contentList.length}}\n{name2|${deptName}}`;
                                 } else {
-                                    if (params.name.length > 5) return `{name2|${params.name.substring(0, 5) + '..'}}`;
-                                    return `{name2|${params.name}}`;
+                                    if (params.name.length > 5) return `{name3|${params.name.substring(0, 5) + '..'}}`;
+                                    return `{name3|${params.name}}`;
                                 }
                             },
                             rich: sharedRich
@@ -173,22 +199,25 @@
                             label: {
                                 show: true,
                                 formatter: function(params) {
-                                    // 호버 시 큰 노드들은 레이아웃을 유지하고, 끝단 노드(Category 2)만 전체 이름을 강조
+                                    // 호버 시 부서명(Category 2)이나 콘텐츠명(Category 3) 전체 텍스트 표시
                                     if (params.data.category === 0) {
                                         return `{spacer0| }\n{count0|${params.data.contentList.length}}\n{name0|${params.name}}`;
                                     } else if (params.data.category === 1) {
                                         return `{spacer1| }\n{count1|${params.data.contentList.length}}\n{name1|${params.name.split(' (')[0]}}`;
+                                    } else if (params.data.category === 2) {
+                                        return `{spacer2| }\n{count2|${params.data.contentList.length}}\n{name2|${params.name}}`; 
                                     } else {
-                                        return `{name2Emph|${params.name}}`;
+                                        return `{name3Emph|${params.name}}`;
                                     }
                                 },
                                 rich: sharedRich
                             }
                         },
                         force: {
+                            // 뎁스(Depth)가 4단계로 깊어졌으므로 노드들이 서로 거리를 두도록 반발력 약간 조정
                             repulsion: 900, 
-                            edgeLength: [60, 150], 
-                            gravity: 0.25 
+                            edgeLength: [50, 130], 
+                            gravity: 0.35 // 중앙에 안정적으로 모이게 하는 중력 강화
                         },
                         lineStyle: {
                             color: 'source',
@@ -208,7 +237,8 @@
             const tableContainer = document.getElementById('table-container');
             const infoBoxTitle = document.querySelector('#infoBox h2');
 
-            if ((nodeData.category === 0 || nodeData.category === 1) && nodeData.contentList) {
+            // Category 0, 1, 2 노드를 클릭하면 해당 소속의 콘텐츠 목록 표출
+            if ([0, 1, 2].includes(nodeData.category) && nodeData.contentList) {
                 const baseName = nodeData.category === 1 ? nodeData.name.split(' (')[0] : nodeData.name;
                 const displayName = baseName + " 콘텐츠 목록";
                 
@@ -231,7 +261,8 @@
                 tableHTML += '</tbody></table>';
                 tableContainer.innerHTML = tableHTML;
             }
-            else if (nodeData.category === 2 && nodeData.value) {
+            // Category 3 (콘텐츠) 노드를 클릭하면 단일 콘텐츠 상세 정보 표출
+            else if (nodeData.category === 3 && nodeData.value) {
                 const detailData = nodeData.value;
                 infoBoxTitle.textContent = "상세 정보 : " + nodeData.name;
 
@@ -268,8 +299,9 @@
                     document.getElementById('table-container').innerHTML = `
                         <p class="placeholder-text" style="color:#a371f7; font-weight:bold;">
                             데이터 로드 완료! <br><br>
-                            1. <b>[공동활용 가능/불가]</b> 또는 <b>[AI교육 O/X]</b> 노드를 클릭하면 해당 그룹의 전체 목록이 표출됩니다.<br><br>
-                            2. <b>[콘텐츠명]</b>을 클릭하면 세부 정보가 표출됩니다.
+                            1. 마우스를 올려서 생략된 긴 텍스트를 확인해보세요.<br><br>
+                            2. <b>[부서명]</b> 등 큰 노드를 클릭하면 해당 그룹의 전체 목록이 표출됩니다.<br><br>
+                            3. <b>[콘텐츠명]</b>(작은 점)을 클릭하면 단일 세부 정보가 표출됩니다.
                         </p>
                     `;
                     
