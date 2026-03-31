@@ -28,10 +28,9 @@
 <body>
 
     <header>
-        <h1>온라인콘텐츠 활용 여부 기반 분리형 네트워크 뷰</h1>
-        <div>
-            <label for="csvFileInput" style="margin-right: 10px; font-weight: bold; color: #a371f7;">CSV 데이터 업로드:</label>
-            <input type="file" id="csvFileInput" accept=".csv" style="color: #fff;" />
+        <h1>온라인콘텐츠 활용 여부 기반 네트워크 뷰</h1>
+        <div style="color: #a371f7; font-size: 0.9rem; font-weight: bold;">
+            🟢 데이터 자동 연동 중...
         </div>
     </header>
 
@@ -41,11 +40,8 @@
             <div class="info-box" id="infoBox">
                 <h2>콘텐츠 상세 정보</h2>
                 <div id="table-container">
-                    <p class="placeholder-text">
-                        1. 상단의 <b>[파일 선택]</b> 버튼으로 CSV를 업로드하세요.<br><br>
-                        2. <b>[AI교육 O/X]</b> 노드를 클릭하면 해당 그룹의 전체 콘텐츠 목록이 표로 나타납니다.<br><br>
-                        3. 마우스를 작은 노드 위에 올리면 전체 이름이 확대되어 보입니다.<br><br>
-                        4. 끝단의 <b>[콘텐츠 노드]</b>를 클릭하면 해당 콘텐츠의 세부 정보가 나타납니다.
+                    <p class="placeholder-text" id="loading-text">
+                        데이터를 불러오는 중입니다. 잠시만 기다려주세요...
                     </p>
                 </div>
             </div>
@@ -79,13 +75,11 @@
                 const aiId = `ai_${availLabel}_${rawAi}`;
                 const contentId = `content_${index}`; 
 
-                // 1. 공동활용 노드 생성
                 if (!nodeMap.has(availId)) {
                     nodes.push({ id: availId, name: availLabel, category: 0, symbolSize: 55 });
                     nodeMap.set(availId, true);
                 }
 
-                // 2. AI교육 노드 생성
                 let aiNode = nodes.find(n => n.id === aiId);
                 if (!aiNode) {
                     aiNode = { id: aiId, name: aiLabel, category: 1, symbolSize: 35, contentList: [] };
@@ -95,7 +89,6 @@
                 }
                 aiNode.contentList.push(row);
 
-                // 3. 콘텐츠 노드 생성
                 if (!nodeMap.has(contentId)) {
                     nodes.push({ id: contentId, name: contentName, category: 2, value: row, symbolSize: 6 });
                     nodeMap.set(contentId, true);
@@ -103,12 +96,11 @@
                 }
             });
 
-            // 🔥 핵심 문제 해결: 두 그룹 간의 겹침/꼬임 방지를 위한 '투명 링크' 추가
+            // 투명 링크 유지 (그룹 간 교차 방지)
             if (nodeMap.has('avail_공동활용 가능') && nodeMap.has('avail_공동활용 불가')) {
                 links.push({
                     source: 'avail_공동활용 가능',
                     target: 'avail_공동활용 불가',
-                    // 선의 굵기와 투명도를 0으로 설정하여 화면에는 보이지 않게 함
                     lineStyle: { width: 0, opacity: 0 } 
                 });
             }
@@ -117,8 +109,6 @@
         }
 
         function renderGraph(graphData) {
-            myChart.showLoading();
-            
             const option = {
                 tooltip: {
                     trigger: 'item',
@@ -175,10 +165,9 @@
                             }
                         },
                         force: {
-                            // 🔥 투명 링크가 생겼으므로 중력 수치를 안정화된 값으로 재조정
-                            repulsion: 900, // 각 노드가 밀어내는 힘 
-                            edgeLength: [60, 150], // 선 길이를 다소 짧게 유지하여 그룹이 컴팩트하게 모임
-                            gravity: 0.25 // 화면 중앙으로 당기는 힘 (겹침 현상이 해결되었으므로 과도한 중력 불필요)
+                            repulsion: 900, 
+                            edgeLength: [60, 150], 
+                            gravity: 0.25 
                         },
                         lineStyle: {
                             color: 'source',
@@ -190,7 +179,7 @@
             };
 
             myChart.setOption(option, true);
-            myChart.hideLoading();
+            myChart.hideLoading(); // 렌더링 끝나면 로딩 스피너 제거
         }
 
         myChart.on('click', function (params) {
@@ -241,24 +230,37 @@
             }
         });
 
-        document.getElementById('csvFileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+        // 🔥 웹페이지 로드 시 자동으로 CSV 파일을 다운로드 및 파싱
+        window.addEventListener('DOMContentLoaded', () => {
+            myChart.showLoading(); // 로딩 스피너 시작
 
-            document.querySelector('#infoBox h2').textContent = "콘텐츠 상세 정보";
-            document.getElementById('table-container').innerHTML = '<p class="placeholder-text" style="color:#a371f7; font-weight:bold;">데이터 렌더링 완료! 마우스 휠을 굴려 확대/축소해 보세요.</p>';
+            // 깃허브에 올릴 CSV 파일명 (반드시 영문명으로 변경하여 업로드하세요)
+            const csvFilePath = 'data.csv'; 
 
-            Papa.parse(file, {
+            Papa.parse(csvFilePath, {
+                download: true, // 로컬 파일이 아닌 경로에서 파일을 다운로드해서 읽음
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
                     const csvData = results.data;
+                    
+                    // 우측 패널 안내 문구 업데이트
+                    document.getElementById('table-container').innerHTML = `
+                        <p class="placeholder-text" style="color:#a371f7; font-weight:bold;">
+                            데이터 로드 완료! <br><br>
+                            좌측 네트워크 그래프에서 노드를 클릭해 상세 정보를 확인하세요.
+                        </p>
+                    `;
+                    
                     const graphData = buildGraphData(csvData);
                     renderGraph(graphData);
                 },
                 error: function(err) {
-                    alert("파일을 읽는 중 오류가 발생했습니다.");
+                    // 파일을 찾지 못하거나 오류가 났을 때의 처리
+                    alert("데이터를 불러오는 중 오류가 발생했습니다. CSV 파일명(data.csv)과 경로를 확인해주세요.");
                     console.error(err);
+                    myChart.hideLoading();
+                    document.getElementById('loading-text').textContent = "데이터 로드 실패";
                 }
             });
         });
