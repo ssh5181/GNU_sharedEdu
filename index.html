@@ -79,11 +79,13 @@
                 const aiId = `ai_${availLabel}_${rawAi}`;
                 const contentId = `content_${index}`; 
 
+                // 1. 공동활용 노드 생성
                 if (!nodeMap.has(availId)) {
                     nodes.push({ id: availId, name: availLabel, category: 0, symbolSize: 55 });
                     nodeMap.set(availId, true);
                 }
 
+                // 2. AI교육 노드 생성
                 let aiNode = nodes.find(n => n.id === aiId);
                 if (!aiNode) {
                     aiNode = { id: aiId, name: aiLabel, category: 1, symbolSize: 35, contentList: [] };
@@ -93,12 +95,23 @@
                 }
                 aiNode.contentList.push(row);
 
+                // 3. 콘텐츠 노드 생성
                 if (!nodeMap.has(contentId)) {
                     nodes.push({ id: contentId, name: contentName, category: 2, value: row, symbolSize: 6 });
                     nodeMap.set(contentId, true);
                     links.push({ source: aiId, target: contentId });
                 }
             });
+
+            // 🔥 핵심 문제 해결: 두 그룹 간의 겹침/꼬임 방지를 위한 '투명 링크' 추가
+            if (nodeMap.has('avail_공동활용 가능') && nodeMap.has('avail_공동활용 불가')) {
+                links.push({
+                    source: 'avail_공동활용 가능',
+                    target: 'avail_공동활용 불가',
+                    // 선의 굵기와 투명도를 0으로 설정하여 화면에는 보이지 않게 함
+                    lineStyle: { width: 0, opacity: 0 } 
+                });
+            }
 
             return { nodes, links };
         }
@@ -162,10 +175,10 @@
                             }
                         },
                         force: {
-                            // 🔥 반발력을 줄이고 중력을 대폭 올려 두 묶음이 화면 중앙에서 가깝게 유지되도록 변경
-                            repulsion: 800, // 기존 1200에서 800으로 감소 (너무 심하게 밀어내지 않음)
-                            edgeLength: [80, 200], // 선 길이 축소 (노드들이 중심부로 더 모임)
-                            gravity: 0.45 // 기존 0.15에서 0.45로 대폭 증가 (중앙으로 강하게 끌어당김)
+                            // 🔥 투명 링크가 생겼으므로 중력 수치를 안정화된 값으로 재조정
+                            repulsion: 900, // 각 노드가 밀어내는 힘 
+                            edgeLength: [60, 150], // 선 길이를 다소 짧게 유지하여 그룹이 컴팩트하게 모임
+                            gravity: 0.25 // 화면 중앙으로 당기는 힘 (겹침 현상이 해결되었으므로 과도한 중력 불필요)
                         },
                         lineStyle: {
                             color: 'source',
