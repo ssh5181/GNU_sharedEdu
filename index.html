@@ -65,26 +65,20 @@
 
                 const rawAvail = row['공동활용가능여부'] || '아니오';
                 const availLabel = rawAvail === '예' ? '공동활용 가능' : '공동활용 불가';
-                
                 const rawAi = row['AI교육여부'] || 'X';
                 const aiLabel = `AI교육 ${rawAi} (${availLabel})`; 
-                
                 const contentName = row['콘텐츠명'];
 
                 const availId = `avail_${availLabel}`;
                 const aiId = `ai_${availLabel}_${rawAi}`;
                 const contentId = `content_${index}`; 
 
-                // 1. 공동활용 노드 (Category 0) - contentList 속성 추가
-                let availNode = nodes.find(n => n.id === availId);
-                if (!availNode) {
-                    availNode = { id: availId, name: availLabel, category: 0, symbolSize: 55, contentList: [] };
-                    nodes.push(availNode);
+                if (!nodeMap.has(availId)) {
+                    nodes.push({ id: availId, name: availLabel, category: 0, symbolSize: 55, contentList: [] });
                     nodeMap.set(availId, true);
                 }
-                availNode.contentList.push(row); // 해당 그룹의 콘텐츠 누적 저장
+                nodes.find(n => n.id === availId).contentList.push(row);
 
-                // 2. AI교육 노드 (Category 1)
                 let aiNode = nodes.find(n => n.id === aiId);
                 if (!aiNode) {
                     aiNode = { id: aiId, name: aiLabel, category: 1, symbolSize: 35, contentList: [] };
@@ -92,9 +86,8 @@
                     nodeMap.set(aiId, true);
                     links.push({ source: availId, target: aiId });
                 }
-                aiNode.contentList.push(row); // 해당 AI교육 여부의 콘텐츠 누적 저장
+                aiNode.contentList.push(row);
 
-                // 3. 콘텐츠 노드 (Category 2)
                 if (!nodeMap.has(contentId)) {
                     nodes.push({ id: contentId, name: contentName, category: 2, value: row, symbolSize: 6 });
                     nodeMap.set(contentId, true);
@@ -102,7 +95,6 @@
                 }
             });
 
-            // 투명 링크 (두 그룹 간 교차 및 꼬임 방지)
             if (nodeMap.has('avail_공동활용 가능') && nodeMap.has('avail_공동활용 불가')) {
                 links.push({
                     source: 'avail_공동활용 가능',
@@ -114,12 +106,28 @@
             return { nodes, links };
         }
 
+        // 공통 서식 딕셔너리 (마우스 호버 시에도 동일한 간격 유지용)
+        const sharedRich = {
+            // Category 0: 노드 반지름 27.5px
+            spacer0: { height: 36, lineHeight: 36 }, // 상단 여백
+            count0: { fontSize: 18, color: '#fff', fontWeight: 'bold', align: 'center', lineHeight: 18 }, // 정중앙 숫자
+            name0: { fontSize: 15, color: '#fff', fontWeight: 'bold', align: 'center', padding: [21, 0, 0, 0], lineHeight: 15 }, // 하단 바깥 텍스트 (투명 여백 21px로 원 밖으로 밀어냄)
+            
+            // Category 1: 노드 반지름 17.5px
+            spacer1: { height: 26, lineHeight: 26 }, 
+            count1: { fontSize: 14, color: '#fff', fontWeight: 'bold', align: 'center', lineHeight: 14 },
+            name1: { fontSize: 13, color: '#e0e0e0', fontWeight: 'bold', align: 'center', padding: [13, 0, 0, 0], lineHeight: 13 },
+            
+            // Category 2: 끝단 노드
+            name2: { fontSize: 9, color: '#888' },
+            name2Emph: { fontSize: 13, color: '#fff', backgroundColor: 'rgba(0,0,0,0.7)', padding: [4, 6], borderRadius: 4 }
+        };
+
         function renderGraph(graphData) {
             const option = {
                 tooltip: {
                     trigger: 'item',
                     formatter: function(params) {
-                        // 툴팁에도 개수(건)를 명시적으로 표시
                         if (params.data.category === 0) return `${params.name} (${params.data.contentList.length}건)`;
                         if (params.data.category === 1) return `${params.name.split(' (')[0]} (${params.data.contentList.length}건)`;
                         return params.name;
@@ -137,46 +145,44 @@
                         layout: 'force', 
                         data: graphData.nodes,
                         links: graphData.links,
+                        // 그룹별로 텍스트 위치를 다르게 지정
                         categories: [
-                            { name: '공동활용 그룹', label: { fontSize: 16, fontWeight: 'bold', color: '#fff', align: 'center' } },
-                            { name: 'AI교육 여부', label: { fontSize: 13, fontWeight: 'bold', align: 'center' } },
-                            { name: '콘텐츠', label: { fontSize: 8, color: '#666' } } 
+                            { name: '공동활용 그룹', label: { position: 'inside' } },
+                            { name: 'AI교육 여부', label: { position: 'inside' } },
+                            { name: '콘텐츠', label: { position: 'right' } } 
                         ],
                         roam: true, 
                         draggable: true, 
                         label: {
                             show: true,
-                            position: 'right',
+                            // 위치와 여백(Padding)을 이용해 숫자는 중심에, 글씨는 바깥에 표시하는 핵심 로직
                             formatter: function(params) {
-                                // Category 0: 공동활용 그룹 라벨 밑에 개수 표시 (예: 공동활용 가능 \n (100))
                                 if (params.data.category === 0) {
-                                    return `${params.name}\n(${params.data.contentList.length})`;
+                                    return `{spacer0| }\n{count0|${params.data.contentList.length}}\n{name0|${params.name}}`;
+                                } else if (params.data.category === 1) {
+                                    return `{spacer1| }\n{count1|${params.data.contentList.length}}\n{name1|${params.name.split(' (')[0]}}`;
+                                } else {
+                                    if (params.name.length > 5) return `{name2|${params.name.substring(0, 5) + '..'}}`;
+                                    return `{name2|${params.name}}`;
                                 }
-                                // Category 1: AI교육 여부 라벨 밑에 개수 표시
-                                if (params.data.category === 1) {
-                                    return `${params.name.split(' (')[0]}\n(${params.data.contentList.length})`;
-                                }
-                                // Category 2: 콘텐츠명 생략 처리
-                                if (params.data.category === 2 && params.name.length > 5) {
-                                    return params.name.substring(0, 5) + '..';
-                                }
-                                return params.name;
-                            }
+                            },
+                            rich: sharedRich
                         },
                         emphasis: {
                             focus: 'adjacency', 
                             label: {
                                 show: true,
-                                fontSize: 13,
-                                color: '#fff',
-                                backgroundColor: 'rgba(0,0,0,0.7)',
-                                padding: [4, 6],
-                                borderRadius: 4,
                                 formatter: function(params) {
-                                    if (params.data.category === 0) return `${params.name} (${params.data.contentList.length}건)`;
-                                    if (params.data.category === 1) return `${params.name.split(' (')[0]} (${params.data.contentList.length}건)`;
-                                    return params.name; 
-                                }
+                                    // 호버 시 큰 노드들은 레이아웃을 유지하고, 끝단 노드(Category 2)만 전체 이름을 강조
+                                    if (params.data.category === 0) {
+                                        return `{spacer0| }\n{count0|${params.data.contentList.length}}\n{name0|${params.name}}`;
+                                    } else if (params.data.category === 1) {
+                                        return `{spacer1| }\n{count1|${params.data.contentList.length}}\n{name1|${params.name.split(' (')[0]}}`;
+                                    } else {
+                                        return `{name2Emph|${params.name}}`;
+                                    }
+                                },
+                                rich: sharedRich
                             }
                         },
                         force: {
@@ -202,9 +208,7 @@
             const tableContainer = document.getElementById('table-container');
             const infoBoxTitle = document.querySelector('#infoBox h2');
 
-            // 클릭한 노드가 '공동활용 그룹(0)' 이거나 'AI교육 여부(1)'일 경우 콘텐츠 목록 표출
             if ((nodeData.category === 0 || nodeData.category === 1) && nodeData.contentList) {
-                // 노드명에서 불필요한 괄호 부분 제거하여 제목 생성
                 const baseName = nodeData.category === 1 ? nodeData.name.split(' (')[0] : nodeData.name;
                 const displayName = baseName + " 콘텐츠 목록";
                 
@@ -227,7 +231,6 @@
                 tableHTML += '</tbody></table>';
                 tableContainer.innerHTML = tableHTML;
             }
-            // 클릭한 노드가 끝단 '콘텐츠(Category 2)'인 경우 상세 정보 표출
             else if (nodeData.category === 2 && nodeData.value) {
                 const detailData = nodeData.value;
                 infoBoxTitle.textContent = "상세 정보 : " + nodeData.name;
@@ -253,7 +256,6 @@
         window.addEventListener('DOMContentLoaded', () => {
             myChart.showLoading(); 
 
-            // 깃허브에 업로드된 CSV 파일 (data.csv로 변경하여 같은 폴더에 업로드 필요)
             const csvFilePath = 'data.csv'; 
 
             Papa.parse(csvFilePath, {
